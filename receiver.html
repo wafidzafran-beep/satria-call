@@ -23,7 +23,7 @@
       padding: 30px 20px;
       border-radius: 20px;
       text-align: center;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      box-shadow: 0 8px 30px rgba(0,0,0,.12);
     }
 
     .icon {
@@ -58,118 +58,136 @@
 
 <body>
 
-  <div class="card">
+<div class="card">
 
-    <div class="icon">📞</div>
+  <div class="icon">📞</div>
 
-    <h1>AVEDOW CALL</h1>
+  <h1>AVEDOW CALL</h1>
 
-    <div id="status">Menghubungkan...</div>
+  <div id="status">
+    Menghubungkan...
+  </div>
 
-    <div id="callBox">
-      <p>📞 Ada panggilan masuk!</p>
-      <button onclick="terimaPanggilan()">
-        TERIMA PANGGILAN
-      </button>
-    </div>
+  <div id="callBox">
+
+    <p>📞 ADA PANGGILAN MASUK!</p>
+
+    <button onclick="terimaPanggilan()">
+      TERIMA PANGGILAN
+    </button>
 
   </div>
 
-  <script type="module">
+</div>
 
-    import { initializeApp }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+<script type="module">
 
-    import {
-      getAuth,
-      signInAnonymously
-    }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { initializeApp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-    import {
-      getFirestore,
-      collection,
-      query,
-      where,
-      onSnapshot,
-      orderBy,
-      limit
-    }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getAuth, signInAnonymously }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  import {
+    getFirestore,
+    collection,
+    onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDD0xBU25FCgEBs7eEtJhbCs_u8iSPISQw",
-      authDomain: "avedow-call.firebaseapp.com",
-      projectId: "avedow-call",
-      storageBucket: "avedow-call.firebasestorage.app",
-      messagingSenderId: "520287803907",
-      appId: "1:520287803907:web:ecaa9a6b6ebf72e7d14c36",
-      measurementId: "G-YJKPCCSL4G"
-    };
+  const firebaseConfig = {
+
+    apiKey: "AIzaSyDD0xBU25FCbEBs7eEtJhbCs_u8iSPISQw",
+
+    authDomain: "avedow-call.firebaseapp.com",
+
+    projectId: "avedow-call",
+
+    storageBucket: "avedow-call.firebasestorage.app",
+
+    messagingSenderId: "520287803907",
+
+    appId: "1:520287803907:web:ecaa9a6b6ebf72e7d14c36",
+
+    measurementId: "G-YJKPCCSL4G"
+
+  };
 
 
-    const app = initializeApp(firebaseConfig);
+  const app = initializeApp(firebaseConfig);
 
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+  const auth = getAuth(app);
 
-
-    let panggilanAktif = null;
+  const db = getFirestore(app);
 
 
-    try {
-
-      await signInAnonymously(auth);
-
-      document.getElementById("status").textContent =
-        "✅ Menunggu panggilan...";
+  let panggilanAktif = null;
 
 
-      const q = query(
-        collection(db, "calls"),
-        where("status", "==", "menunggu"),
-        orderBy("waktu", "desc"),
-        limit(1)
-      );
+  try {
+
+    await signInAnonymously(auth);
+
+    document.getElementById("status").textContent =
+      "✅ Menunggu panggilan...";
 
 
-      onSnapshot(q, (snapshot) => {
+    const callsRef = collection(db, "calls");
 
-        if (!snapshot.empty) {
 
-          panggilanAktif = snapshot.docs[0];
+    onSnapshot(callsRef, (snapshot) => {
 
-          document.getElementById("status").textContent =
-            "📞 Panggilan masuk!";
+      let ditemukan = false;
 
-          document.getElementById("callBox").style.display =
-            "block";
+
+      snapshot.forEach((doc) => {
+
+        const data = doc.data();
+
+
+        if (data.status === "menunggu") {
+
+          panggilanAktif = doc;
+
+          ditemukan = true;
 
         }
 
       });
 
 
-    } catch (error) {
+      if (ditemukan) {
 
-      console.error(error);
+        document.getElementById("status").textContent =
+          "📞 PANGGILAN MASUK!";
 
-      document.getElementById("status").textContent =
-        "❌ Gagal terhubung";
+        document.getElementById("callBox").style.display =
+          "block";
 
-    }
+      }
+
+    });
 
 
-    window.terimaPanggilan = function() {
+  } catch (error) {
 
-      if (!panggilanAktif) return;
+    console.error(error);
 
-      alert("Panggilan diterima!");
+    document.getElementById("status").textContent =
+      "❌ Gagal terhubung ke Firebase";
 
-    };
+  }
 
-  </script>
+
+  window.terimaPanggilan = function() {
+
+    if (!panggilanAktif) return;
+
+    alert("📞 Panggilan diterima!");
+
+  };
+
+</script>
 
 </body>
 </html>
