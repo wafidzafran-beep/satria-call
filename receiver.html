@@ -9,33 +9,24 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background: #f2f4f7;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-
-    .card {
-      width: 90%;
-      max-width: 380px;
-      background: white;
-      padding: 30px 20px;
-      border-radius: 20px;
+      background: #111;
+      color: white;
       text-align: center;
-      box-shadow: 0 8px 30px rgba(0,0,0,.12);
     }
 
-    .icon {
-      font-size: 60px;
+    .container {
+      width: 100%;
+      max-width: 500px;
+      margin: auto;
+      padding: 20px;
+      box-sizing: border-box;
     }
 
     h1 {
-      margin: 10px 0;
+      margin: 10px 0 20px;
     }
 
     #status {
-      color: #666;
       margin: 15px 0;
     }
 
@@ -43,14 +34,24 @@
       display: none;
     }
 
+    video {
+      width: 100%;
+      max-height: 60vh;
+      background: #222;
+      border-radius: 16px;
+      object-fit: cover;
+      margin-top: 15px;
+    }
+
     button {
       width: 100%;
       padding: 16px;
+      margin-top: 15px;
       border: none;
       border-radius: 12px;
       font-size: 18px;
       font-weight: bold;
-      background: #111;
+      background: #16a34a;
       color: white;
     }
   </style>
@@ -58,11 +59,9 @@
 
 <body>
 
-<div class="card">
+<div class="container">
 
-  <div class="icon">📞</div>
-
-  <h1>AVEDOW CALL</h1>
+  <h1>📞 AVEDOW CALL</h1>
 
   <div id="status">
     Menghubungkan...
@@ -70,7 +69,7 @@
 
   <div id="callBox">
 
-    <p>📞 ADA PANGGILAN MASUK!</p>
+    <p>📞 <b>PANGGILAN MASUK!</b></p>
 
     <button onclick="terimaPanggilan()">
       TERIMA PANGGILAN
@@ -78,7 +77,10 @@
 
   </div>
 
+  <video id="localVideo" autoplay playsinline muted></video>
+
 </div>
+
 
 <script type="module">
 
@@ -97,7 +99,7 @@
 
   const firebaseConfig = {
 
-    apiKey:"AIzaSyDD0xBU25FCgEBs7eEtJhbCs_u8iSPISQw",
+    apiKey: "AIzaSyDD0xBU25FCgEBs7eEtJhbCs_u8iSPISQw",
 
     authDomain: "avedow-call.firebaseapp.com",
 
@@ -174,16 +176,39 @@
     console.error(error);
 
     document.getElementById("status").textContent =
-      "❌ Gagal terhubung ke Firebase";
+      "❌ " + error.message;
 
   }
 
 
-  window.terimaPanggilan = function() {
+  window.terimaPanggilan = async function() {
 
-    if (!panggilanAktif) return;
+    try {
 
-    alert("📞 Panggilan diterima!");
+      document.getElementById("status").textContent =
+        "🎥 Meminta akses kamera dan mikrofon...";
+
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+
+
+      document.getElementById("localVideo").srcObject = stream;
+
+      document.getElementById("status").textContent =
+        "✅ Kamera dan mikrofon aktif";
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      document.getElementById("status").textContent =
+        "❌ Izin kamera/mikrofon ditolak";
+
+    }
 
   };
 
