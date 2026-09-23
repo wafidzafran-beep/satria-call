@@ -15,41 +15,59 @@
     }
 
     .container {
-      width: 92%;
       max-width: 500px;
       margin: auto;
-      padding: 25px 0;
+      padding: 20px;
     }
 
     h1 {
-      margin-bottom: 10px;
+      margin-top: 20px;
     }
 
     #status {
-      margin: 15px 0;
+      margin: 20px 0;
+      font-size: 18px;
     }
 
-    #callBox {
+    #incoming {
       display: none;
+      background: #222;
+      padding: 20px;
+      border-radius: 15px;
+      margin-top: 20px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 15px 30px;
+      font-size: 18px;
+      margin: 8px;
+      cursor: pointer;
+    }
+
+    #terima {
+      background: #16c784;
+      color: white;
+    }
+
+    #tolak {
+      background: #e53935;
+      color: white;
     }
 
     video {
       width: 100%;
-      background: #222;
-      border-radius: 16px;
+      max-width: 480px;
+      background: black;
+      border-radius: 15px;
       margin-top: 15px;
     }
 
-    button {
-      width: 100%;
-      padding: 16px;
+    .label {
       margin-top: 15px;
-      border: none;
-      border-radius: 12px;
-      font-size: 18px;
-      font-weight: bold;
-      background: #16a34a;
-      color: white;
+      font-size: 14px;
+      color: #aaa;
     }
   </style>
 </head>
@@ -58,41 +76,45 @@
 
 <div class="container">
 
-  <h1>📞 AVEDOW CALL</h1>
+  <h1>AVEDOW CALL</h1>
 
-  <div id="status">
-    Menghubungkan...
+  <div id="status">🔄 Menunggu panggilan...</div>
+
+  <div id="incoming">
+    <h2>📞 PANGGILAN MASUK!</h2>
+    <p>Seseorang sedang memanggil Anda.</p>
+
+    <button id="terima">TERIMA</button>
+    <button id="tolak">TOLAK</button>
   </div>
 
-  <div id="callBox">
+  <div id="callArea" style="display:none;">
 
-    <p>📞 <b>PANGGILAN MASUK!</b></p>
+    <div class="label">📹 Video penelepon</div>
+    <video id="remoteVideo" autoplay playsinline></video>
 
-    <button onclick="terimaPanggilan()">
-      TERIMA PANGGILAN
-    </button>
+    <div class="label">🎥 Video Anda</div>
+    <video id="localVideo" autoplay muted playsinline></video>
 
   </div>
-
-  <video id="remoteVideo" autoplay playsinline></video>
 
 </div>
 
 <script type="module">
 
-  import { initializeApp }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    initializeApp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
   import {
     getAuth,
-    signInAnonymously
+    signInAnonymously,
+    onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   import {
     getFirestore,
     collection,
-    query,
-    where,
     onSnapshot,
     doc,
     updateDoc,
@@ -100,22 +122,18 @@
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
+  // ==============================
+  // FIREBASE
+  // ==============================
+
   const firebaseConfig = {
-
     apiKey: "AIzaSyDD0xBU25FCgEBs7eEtJhbCs_u8iSPISQw",
-
     authDomain: "avedow-call.firebaseapp.com",
-
     projectId: "avedow-call",
-
     storageBucket: "avedow-call.firebasestorage.app",
-
     messagingSenderId: "520287803907",
-
     appId: "1:520287803907:web:ecaa9a6b6ebf72e7d14c36",
-
     measurementId: "G-YJKPCCSL4G"
-
   };
 
 
@@ -126,19 +144,52 @@
   const db = getFirestore(app);
 
 
-  let panggilanAktif = null;
+  // ==============================
+  // ELEMENT
+  // ==============================
+
+  const statusText = document.getElementById("status");
+
+  const incomingBox = document.getElementById("incoming");
+
+  const terimaButton = document.getElementById("terima");
+
+  const tolakButton = document.getElementById("tolak");
+
+  const callArea = document.getElementById("callArea");
+
+  const remoteVideo = document.getElementById("remoteVideo");
+
+  const localVideo = document.getElementById("localVideo");
+
+
+  // ==============================
+  // WEBRTC
+  // ==============================
 
   let peerConnection = null;
 
   let localStream = null;
 
+  let activeCall = null;
 
-  const servers = {
+  let activeCallData = null;
+
+  let remoteDescriptionSet = false;
+
+  const receivedCallerCandidates = new Set();
+
+
+  const rtcConfig = {
 
     iceServers: [
 
       {
         urls: "stun:stun.l.google.com:19302"
+      },
+
+      {
+        urls: "stun:stun1.l.google.com:19302"
       }
 
     ]
@@ -146,132 +197,275 @@
   };
 
 
+  // ==============================
+  // LOGIN ANONYMOUS
+  // ==============================
+
   try {
 
     await signInAnonymously(auth);
-
-    document.getElementById("status").textContent =
-      "✅ Menunggu panggilan...";
-
-
-    const q = query(
-      collection(db, "calls"),
-      where("status", "==", "menunggu")
-    );
-
-
-    onSnapshot(q, (snapshot) => {
-
-  if (snapshot.empty) return;
-
-  const docs = snapshot.docs;
-
-  const calon = docs[docs.length - 1];
-  const data = calon.data();
-
-  // Jangan tampilkan panggilan sebelum offer tersedia
-  if (!data.offer) {
-    document.getElementById("status").textContent =
-      "📞 Menyiapkan panggilan...";
-    return;
-  }
-
-  panggilanAktif = calon;
-
-  document.getElementById("status").textContent =
-    "📞 PANGGILAN MASUK!";
-
-  document.getElementById("callBox").style.display =
-    "block";
-
-});
-
-    });
-
 
   } catch (error) {
 
     console.error(error);
 
-    document.getElementById("status").textContent =
-      "❌ " + error.message;
+    statusText.textContent =
+      "❌ Gagal terhubung ke Firebase";
 
   }
 
 
-  window.terimaPanggilan = async function() {
+  onAuthStateChanged(auth, (user) => {
 
-    if (!panggilanAktif) return;
+    if (user) {
+
+      console.log("Penerima login:", user.uid);
+
+      mulaiMencariPanggilan();
+
+    }
+
+  });
+
+
+  // ==============================
+  // CARI PANGGILAN
+  // ==============================
+
+  function mulaiMencariPanggilan() {
+
+    const callsRef = collection(db, "calls");
+
+
+    onSnapshot(callsRef, (snapshot) => {
+
+      let calonCall = null;
+
+      let waktuTerbaru = 0;
+
+
+      snapshot.forEach((item) => {
+
+        const data = item.data();
+
+
+        // HARUS MENUNGGU OFFER YANG VALID
+
+        if (
+          data.status === "menunggu" &&
+          data.offer &&
+          data.offer.type &&
+          data.offer.sdp
+        ) {
+
+          const waktu =
+            Number(data.createdAtMs || 0);
+
+
+          if (waktu >= waktuTerbaru) {
+
+            waktuTerbaru = waktu;
+
+            calonCall = item;
+
+          }
+
+        }
+
+      });
+
+
+      if (calonCall) {
+
+        activeCall = calonCall;
+
+        activeCallData = calonCall.data();
+
+
+        statusText.textContent =
+          "📞 Panggilan masuk!";
+
+
+        incomingBox.style.display = "block";
+
+      }
+
+    });
+
+  }
+
+
+  // ==============================
+  // TERIMA PANGGILAN
+  // ==============================
+
+  terimaButton.addEventListener("click", async () => {
+
+    if (!activeCall) {
+
+      statusText.textContent =
+        "❌ Panggilan tidak ditemukan.";
+
+      return;
+
+    }
+
+
+    terimaButton.disabled = true;
+
+    tolakButton.disabled = true;
+
+
+    statusText.textContent =
+      "🔄 Menghubungkan...";
 
 
     try {
 
-      document.getElementById("callBox").style.display =
-        "none";
+      // ==========================
+      // AKTIFKAN KAMERA + MIC
+      // ==========================
 
-      document.getElementById("status").textContent =
-        "🎥 Menghubungkan...";
+      localStream =
+        await navigator.mediaDevices.getUserMedia({
+
+          video: true,
+
+          audio: true
+
+        });
 
 
-      const callId = panggilanAktif.id;
+      localVideo.srcObject = localStream;
 
-      const callRef = doc(
-        db,
-        "calls",
-        callId
-      );
 
+      // ==========================
+      // PEER CONNECTION
+      // ==========================
 
       peerConnection =
-        new RTCPeerConnection(servers);
+        new RTCPeerConnection(rtcConfig);
 
+
+      // ==========================
+      // MASUKKAN VIDEO + AUDIO
+      // ==========================
+
+      localStream.getTracks().forEach((track) => {
+
+        peerConnection.addTrack(
+          track,
+          localStream
+        );
+
+      });
+
+
+      // ==========================
+      // TERIMA VIDEO DARI PENELEPON
+      // ==========================
 
       peerConnection.ontrack = (event) => {
 
+        console.log(
+          "Video/audio penelepon diterima"
+        );
+
+
         if (event.streams && event.streams[0]) {
 
-          document.getElementById("remoteVideo").srcObject =
+          remoteVideo.srcObject =
             event.streams[0];
+
+          callArea.style.display =
+            "block";
+
+          statusText.textContent =
+            "🟢 Terhubung!";
 
         }
 
       };
 
 
+      // ==========================
+      // ICE CANDIDATE PENERIMA
+      // ==========================
+
       peerConnection.onicecandidate =
         async (event) => {
 
-          if (event.candidate) {
+          if (
+            event.candidate &&
+            activeCall
+          ) {
 
-            await updateDoc(
-              callRef,
-              {
+            try {
 
-                receiverCandidates:
-                  arrayUnion(
-                    event.candidate.toJSON()
-                  )
+              await updateDoc(
+                doc(
+                  db,
+                  "calls",
+                  activeCall.id
+                ),
+                {
 
-              }
-            );
+                  receiverCandidates:
+                    arrayUnion(
+                      event.candidate.toJSON()
+                    )
+
+                }
+              );
+
+            } catch (error) {
+
+              console.error(
+                "Gagal kirim ICE:",
+                error
+              );
+
+            }
 
           }
 
         };
 
 
-      const callData =
-        panggilanAktif.data();
+      // ==========================
+      // OFFER DARI PENELEPON
+      // ==========================
+
+      const offer =
+        activeCallData.offer;
+
+
+      if (
+        !offer ||
+        !offer.type ||
+        !offer.sdp
+      ) {
+
+        throw new Error(
+          "Offer penelepon tidak tersedia."
+        );
+
+      }
 
 
       await peerConnection.setRemoteDescription(
 
-        new RTCSessionDescription(
-          callData.offer
-        )
+        new RTCSessionDescription(offer)
 
       );
 
+
+      remoteDescriptionSet = true;
+
+
+      // ==========================
+      // BUAT ANSWER
+      // ==========================
 
       const answer =
         await peerConnection.createAnswer();
@@ -282,8 +476,18 @@
       );
 
 
+      // ==========================
+      // KIRIM ANSWER KE PENELEPON
+      // ==========================
+
       await updateDoc(
-        callRef,
+
+        doc(
+          db,
+          "calls",
+          activeCall.id
+        ),
+
         {
 
           answer: {
@@ -301,35 +505,84 @@
       );
 
 
-      onSnapshot(
-        callRef,
-        async (snapshot) => {
+      // ==========================
+      // AMBIL ICE DARI PENELEPON
+      // ==========================
 
-          const data = snapshot.data();
+      const unsubscribe =
+        onSnapshot(
 
-          if (!data) return;
+          doc(
+            db,
+            "calls",
+            activeCall.id
+          ),
+
+          async (snapshot) => {
+
+            if (!snapshot.exists()) {
+              return;
+            }
 
 
-          if (data.callerCandidates) {
+            const data =
+              snapshot.data();
+
+
+            const candidates =
+              data.callerCandidates || [];
+
 
             for (
-              const candidate
-              of data.callerCandidates
+              const candidateData
+              of candidates
             ) {
 
               try {
 
-                await peerConnection.addIceCandidate(
+                const candidateKey =
+                  JSON.stringify(
+                    candidateData
+                  );
 
-                  new RTCIceCandidate(
-                    candidate
+
+                if (
+                  receivedCallerCandidates.has(
+                    candidateKey
                   )
+                ) {
 
+                  continue;
+
+                }
+
+
+                receivedCallerCandidates.add(
+                  candidateKey
                 );
 
-              } catch (e) {
 
-                console.log(e);
+                if (
+                  peerConnection &&
+                  remoteDescriptionSet
+                ) {
+
+                  await peerConnection.addIceCandidate(
+
+                    new RTCIceCandidate(
+                      candidateData
+                    )
+
+                  );
+
+                }
+
+              } catch (error) {
+
+                console.error(
+                  "Gagal menambahkan ICE:",
+                  error
+                );
 
               }
 
@@ -337,23 +590,94 @@
 
           }
 
-        }
+        );
+
+
+      incomingBox.style.display =
+        "none";
+
+
+      statusText.textContent =
+        "🔄 Menghubungkan...";
+
+
+      console.log(
+        "Answer berhasil dikirim."
       );
 
 
-      document.getElementById("status").textContent =
-        "🎥 Terhubung!";
+    } catch (error) {
+
+      console.error(
+        "ERROR SAAT TERIMA:",
+        error
+      );
+
+
+      statusText.textContent =
+        "❌ Gagal menghubungkan: " +
+        error.message;
+
+
+      terimaButton.disabled = false;
+
+      tolakButton.disabled = false;
+
+    }
+
+  });
+
+
+  // ==============================
+  // TOLAK
+  // ==============================
+
+  tolakButton.addEventListener("click", async () => {
+
+    if (!activeCall) {
+      return;
+    }
+
+
+    try {
+
+      await updateDoc(
+
+        doc(
+          db,
+          "calls",
+          activeCall.id
+        ),
+
+        {
+
+          status: "ditolak"
+
+        }
+
+      );
+
+
+      incomingBox.style.display =
+        "none";
+
+
+      statusText.textContent =
+        "📵 Panggilan ditolak.";
+
+
+      activeCall = null;
+
+      activeCallData = null;
+
 
     } catch (error) {
 
       console.error(error);
 
-      document.getElementById("status").textContent =
-        "❌ " + error.message;
-
     }
 
-  };
+  });
 
 </script>
 
