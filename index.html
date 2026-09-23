@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -54,6 +54,11 @@
     button:active {
       transform: scale(0.98);
     }
+
+    #status {
+      margin-top: 15px;
+      font-size: 14px;
+    }
   </style>
 </head>
 
@@ -69,13 +74,99 @@
     <button onclick="panggil()">
       📹 PANGGIL
     </button>
+
+    <div id="status">Menghubungkan...</div>
   </div>
 
-  <script>
-    function panggil() {
-      alert("Permintaan panggilan dikirim!");
+  <script type="module">
+
+    import { initializeApp }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+    import {
+      getAuth,
+      signInAnonymously
     }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      serverTimestamp
+    }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDD0xBU25FCgEBs7eEtJhbCs_u8iSPISQw",
+      authDomain: "avedow-call.firebaseapp.com",
+      projectId: "avedow-call",
+      storageBucket: "avedow-call.firebasestorage.app",
+      messagingSenderId: "520287803907",
+      appId: "1:520287803907:web:ecaa9a6b6ebf72e7d14c36",
+      measurementId: "G-YJKPCCSL4G"
+    };
+
+
+    const app = initializeApp(firebaseConfig);
+
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let pengguna = null;
+
+
+    try {
+
+      const hasil = await signInAnonymously(auth);
+
+      pengguna = hasil.user;
+
+      document.getElementById("status").textContent =
+        "✅ Terhubung";
+
+    } catch (error) {
+
+      console.error(error);
+
+      document.getElementById("status").textContent =
+        "❌ Gagal terhubung ke Firebase";
+
+    }
+
+
+    window.panggil = async function() {
+
+      if (!pengguna) {
+        alert("Belum terhubung ke Firebase.");
+        return;
+      }
+
+      try {
+
+        await addDoc(collection(db, "calls"), {
+          callerId: pengguna.uid,
+          status: "menunggu",
+          waktu: serverTimestamp()
+        });
+
+        document.getElementById("status").textContent =
+          "📞 Permintaan panggilan dikirim";
+
+        alert("📞 Panggilan dikirim!");
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert("Gagal mengirim panggilan.");
+
+      }
+
+    };
+
   </script>
 
 </body>
-</html>
+</html>     
