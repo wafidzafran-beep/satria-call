@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -9,164 +9,353 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background: #f2f4f7;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-
-    .card {
-      width: 90%;
-      max-width: 380px;
-      background: white;
-      padding: 30px 20px;
-      border-radius: 20px;
+      background: #111;
+      color: white;
       text-align: center;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
     }
 
-    .icon {
-      font-size: 60px;
-      margin-bottom: 10px;
+    .container {
+      width: 92%;
+      max-width: 500px;
+      margin: auto;
+      padding: 25px 0;
     }
 
     h1 {
-      margin: 5px 0;
+      margin-bottom: 10px;
     }
 
-    p {
-      color: #666;
+    #status {
+      margin: 15px 0;
+    }
+
+    video {
+      width: 100%;
+      background: #222;
+      border-radius: 16px;
+      margin-top: 15px;
     }
 
     button {
       width: 100%;
       padding: 16px;
+      margin-top: 20px;
       border: none;
       border-radius: 12px;
       font-size: 18px;
       font-weight: bold;
-      background: #111;
+      background: #16a34a;
       color: white;
-      cursor: pointer;
     }
 
-    button:active {
-      transform: scale(0.98);
-    }
-
-    #status {
-      margin-top: 15px;
-      font-size: 14px;
+    #videoBox {
+      display: none;
     }
   </style>
 </head>
 
 <body>
 
-  <div class="card">
-    <div class="icon">🏠</div>
+<div class="container">
 
-    <h1>AVEDOW CALL</h1>
+  <h1>📞 AVEDOW CALL</h1>
 
-    <p>Tekan tombol di bawah untuk melakukan panggilan.</p>
-
-    <button onclick="panggil()">
-      📹 PANGGIL
-    </button>
-
-    <div id="status">Menghubungkan...</div>
+  <div id="status">
+    Siap melakukan panggilan
   </div>
 
-  <script type="module">
+  <button id="callButton" onclick="mulaiPanggilan()">
+    📞 PANGGIL
+  </button>
 
-    import { initializeApp }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  <div id="videoBox">
+    <video id="localVideo" autoplay playsinline muted></video>
+  </div>
 
-    import {
-      getAuth,
-      signInAnonymously
-    }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+</div>
 
-    import {
-      getFirestore,
-      collection,
-      addDoc,
-      serverTimestamp
-    }
-      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+<script type="module">
 
+  import { initializeApp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDD0xBU25FCgEBs7eEtJhbCs_u8iSPISQw",
-      authDomain: "avedow-call.firebaseapp.com",
-      projectId: "avedow-call",
-      storageBucket: "avedow-call.firebasestorage.app",
-      messagingSenderId: "520287803907",
-      appId: "1:520287803907:web:ecaa9a6b6ebf72e7d14c36",
-      measurementId: "G-YJKPCCSL4G"
-    };
+  import { getAuth, signInAnonymously }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    updateDoc,
+    doc,
+    onSnapshot,
+    serverTimestamp,
+    arrayUnion
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
-    const app = initializeApp(firebaseConfig);
+  const firebaseConfig = {
 
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+    apiKey: "AIzaSyDD0xBU25FCgEBs7eEtJhbCs_u8iSPISQw",
 
-    let pengguna = null;
+    authDomain: "avedow-call.firebaseapp.com",
 
+    projectId: "avedow-call",
+
+    storageBucket: "avedow-call.firebasestorage.app",
+
+    messagingSenderId: "520287803907",
+
+    appId: "1:520287803907:web:ecaa9a6b6ebf72e7d14c36",
+
+    measurementId: "G-YJKPCCSL4G"
+
+  };
+
+
+  const app = initializeApp(firebaseConfig);
+
+  const auth = getAuth(app);
+
+  const db = getFirestore(app);
+
+
+  let user;
+
+  let localStream;
+
+  let peerConnection;
+
+  let callDoc;
+
+
+  const servers = {
+
+    iceServers: [
+
+      {
+        urls: "stun:stun.l.google.com:19302"
+      }
+
+    ]
+
+  };
+
+
+  try {
+
+    const result = await signInAnonymously(auth);
+
+    user = result.user;
+
+    document.getElementById("status").textContent =
+      "✅ Siap melakukan panggilan";
+
+  } catch (error) {
+
+    console.error(error);
+
+    document.getElementById("status").textContent =
+      "❌ " + error.message;
+
+  }
+
+
+  window.mulaiPanggilan = async function() {
 
     try {
 
-      const hasil = await signInAnonymously(auth);
-
-      pengguna = hasil.user;
+      document.getElementById("callButton").disabled = true;
 
       document.getElementById("status").textContent =
-        "✅ Terhubung";
+        "🎥 Meminta kamera dan mikrofon...";
+
+
+      localStream =
+        await navigator.mediaDevices.getUserMedia({
+
+          video: true,
+
+          audio: true
+
+        });
+
+
+      document.getElementById("localVideo").srcObject =
+        localStream;
+
+      document.getElementById("videoBox").style.display =
+        "block";
+
+
+      peerConnection =
+        new RTCPeerConnection(servers);
+
+
+      localStream.getTracks().forEach(track => {
+
+        peerConnection.addTrack(
+          track,
+          localStream
+        );
+
+      });
+
+
+      callDoc = await addDoc(
+        collection(db, "calls"),
+        {
+
+          callerId: user.uid,
+
+          status: "menunggu",
+
+          waktu: serverTimestamp(),
+
+          offer: null,
+
+          answer: null,
+
+          callerCandidates: [],
+
+          receiverCandidates: []
+
+        }
+      );
+
+
+      const callRef = doc(
+        db,
+        "calls",
+        callDoc.id
+      );
+
+
+      peerConnection.onicecandidate =
+        async (event) => {
+
+          if (event.candidate) {
+
+            await updateDoc(
+              callRef,
+              {
+
+                callerCandidates:
+                  arrayUnion(
+                    event.candidate.toJSON()
+                  )
+
+              }
+            );
+
+          }
+
+        };
+
+
+      const offer =
+        await peerConnection.createOffer();
+
+
+      await peerConnection.setLocalDescription(
+        offer
+      );
+
+
+      await updateDoc(
+        callRef,
+        {
+
+          offer: {
+
+            type: offer.type,
+
+            sdp: offer.sdp
+
+          }
+
+        }
+      );
+
+
+      document.getElementById("status").textContent =
+        "📞 Menunggu penerima menerima panggilan...";
+
+
+      onSnapshot(
+        callRef,
+        async (snapshot) => {
+
+          const data = snapshot.data();
+
+          if (!data) return;
+
+
+          if (
+            data.answer &&
+            !peerConnection.currentRemoteDescription
+          ) {
+
+            await peerConnection.setRemoteDescription(
+
+              new RTCSessionDescription(
+                data.answer
+              )
+
+            );
+
+            document.getElementById("status").textContent =
+              "🎥 Terhubung dengan penerima!";
+
+          }
+
+
+          if (data.receiverCandidates) {
+
+            for (
+              const candidate
+              of data.receiverCandidates
+            ) {
+
+              try {
+
+                await peerConnection.addIceCandidate(
+
+                  new RTCIceCandidate(
+                    candidate
+                  )
+
+                );
+
+              } catch (e) {
+
+                console.log(e);
+
+              }
+
+            }
+
+          }
+
+        }
+      );
+
 
     } catch (error) {
 
       console.error(error);
 
       document.getElementById("status").textContent =
-        "❌ Gagal terhubung ke Firebase";
+        "❌ " + error.message;
+
+      document.getElementById("callButton").disabled =
+        false;
 
     }
 
+  };
 
-    window.panggil = async function() {
-
-      if (!pengguna) {
-        alert("Belum terhubung ke Firebase.");
-        return;
-      }
-
-      try {
-
-        await addDoc(collection(db, "calls"), {
-          callerId: pengguna.uid,
-          status: "menunggu",
-          waktu: serverTimestamp()
-        });
-
-        document.getElementById("status").textContent =
-          "📞 Permintaan panggilan dikirim";
-
-        alert("📞 Panggilan dikirim!");
-
-      } catch (error) {
-
-        console.error(error);
-
-        alert("Gagal mengirim panggilan.");
-
-      }
-
-    };
-
-  </script>
+</script>
 
 </body>
-</html>     
+</html>
