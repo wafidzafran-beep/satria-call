@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AVEDOW CALL</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f4f7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      width: 90%;
+      max-width: 380px;
+      background: white;
+      padding: 30px 20px;
+      border-radius: 20px;
+      text-align: center;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+
+    .icon {
+      font-size: 60px;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 5px 0;
+    }
+
+    p {
+      color: #666;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      background: #111;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <div class="icon">🏠</div>
+
+    <h1>AVEDOW CALL</h1>
+
+    <p>Tekan tombol di bawah untuk melakukan panggilan.</p>
+
+    <button onclick="panggil()">
+      📹 PANGGIL
+    </button>
+  </div>
+
+  <script>
+    function panggil() {
+      alert("Permintaan panggilan dikirim!");
+    }
+  </script>
+
+</body>
+</html>
