@@ -162,17 +162,29 @@
 
     onSnapshot(q, (snapshot) => {
 
-      if (snapshot.empty) return;
+  if (snapshot.empty) return;
 
-      panggilanAktif =
-        snapshot.docs[snapshot.docs.length - 1];
+  const docs = snapshot.docs;
 
+  const calon = docs[docs.length - 1];
+  const data = calon.data();
 
-      document.getElementById("status").textContent =
-        "📞 PANGGILAN MASUK!";
+  // Jangan tampilkan panggilan sebelum offer tersedia
+  if (!data.offer) {
+    document.getElementById("status").textContent =
+      "📞 Menyiapkan panggilan...";
+    return;
+  }
 
-      document.getElementById("callBox").style.display =
-        "block";
+  panggilanAktif = calon;
+
+  document.getElementById("status").textContent =
+    "📞 PANGGILAN MASUK!";
+
+  document.getElementById("callBox").style.display =
+    "block";
+
+});
 
     });
 
