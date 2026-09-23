@@ -15,15 +15,14 @@
     }
 
     .container {
-      width: 100%;
+      width: 92%;
       max-width: 500px;
       margin: auto;
-      padding: 20px;
-      box-sizing: border-box;
+      padding: 25px 0;
     }
 
     h1 {
-      margin: 10px 0 20px;
+      margin-bottom: 10px;
     }
 
     #status {
@@ -36,10 +35,8 @@
 
     video {
       width: 100%;
-      max-height: 60vh;
       background: #222;
       border-radius: 16px;
-      object-fit: cover;
       margin-top: 15px;
     }
 
@@ -77,23 +74,29 @@
 
   </div>
 
-  <video id="localVideo" autoplay playsinline muted></video>
+  <video id="remoteVideo" autoplay playsinline></video>
 
 </div>
-
 
 <script type="module">
 
   import { initializeApp }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-  import { getAuth, signInAnonymously }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getAuth,
+    signInAnonymously
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   import {
     getFirestore,
     collection,
-    onSnapshot
+    query,
+    where,
+    onSnapshot,
+    doc,
+    updateDoc,
+    arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 
@@ -125,6 +128,23 @@
 
   let panggilanAktif = null;
 
+  let peerConnection = null;
+
+  let localStream = null;
+
+
+  const servers = {
+
+    iceServers: [
+
+      {
+        urls: "stun:stun.l.google.com:19302"
+      }
+
+    ]
+
+  };
+
 
   try {
 
@@ -134,39 +154,25 @@
       "✅ Menunggu panggilan...";
 
 
-    const callsRef = collection(db, "calls");
+    const q = query(
+      collection(db, "calls"),
+      where("status", "==", "menunggu")
+    );
 
 
-    onSnapshot(callsRef, (snapshot) => {
+    onSnapshot(q, (snapshot) => {
 
-      let ditemukan = false;
+      if (snapshot.empty) return;
 
-
-      snapshot.forEach((doc) => {
-
-        const data = doc.data();
+      panggilanAktif =
+        snapshot.docs[snapshot.docs.length - 1];
 
 
-        if (data.status === "menunggu") {
+      document.getElementById("status").textContent =
+        "📞 PANGGILAN MASUK!";
 
-          panggilanAktif = doc;
-
-          ditemukan = true;
-
-        }
-
-      });
-
-
-      if (ditemukan) {
-
-        document.getElementById("status").textContent =
-          "📞 PANGGILAN MASUK!";
-
-        document.getElementById("callBox").style.display =
-          "block";
-
-      }
+      document.getElementById("callBox").style.display =
+        "block";
 
     });
 
@@ -183,30 +189,155 @@
 
   window.terimaPanggilan = async function() {
 
+    if (!panggilanAktif) return;
+
+
     try {
 
-      document.getElementById("status").textContent =
-        "🎥 Meminta akses kamera dan mikrofon...";
-
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-
-
-      document.getElementById("localVideo").srcObject = stream;
+      document.getElementById("callBox").style.display =
+        "none";
 
       document.getElementById("status").textContent =
-        "✅ Kamera dan mikrofon aktif";
+        "🎥 Menghubungkan...";
 
+
+      const callId = panggilanAktif.id;
+
+      const callRef = doc(
+        db,
+        "calls",
+        callId
+      );
+
+
+      peerConnection =
+        new RTCPeerConnection(servers);
+
+
+      peerConnection.ontrack = (event) => {
+
+        if (event.streams && event.streams[0]) {
+
+          document.getElementById("remoteVideo").srcObject =
+            event.streams[0];
+
+        }
+
+      };
+
+
+      peerConnection.onicecandidate =
+        async (event) => {
+
+          if (event.candidate) {
+
+            await updateDoc(
+              callRef,
+              {
+
+                receiverCandidates:
+                  arrayUnion(
+                    event.candidate.toJSON()
+                  )
+
+              }
+            );
+
+          }
+
+        };
+
+
+      const callData =
+        panggilanAktif.data();
+
+
+      await peerConnection.setRemoteDescription(
+
+        new RTCSessionDescription(
+          callData.offer
+        )
+
+      );
+
+
+      const answer =
+        await peerConnection.createAnswer();
+
+
+      await peerConnection.setLocalDescription(
+        answer
+      );
+
+
+      await updateDoc(
+        callRef,
+        {
+
+          answer: {
+
+            type: answer.type,
+
+            sdp: answer.sdp
+
+          },
+
+          status: "terhubung"
+
+        }
+
+      );
+
+
+      onSnapshot(
+        callRef,
+        async (snapshot) => {
+
+          const data = snapshot.data();
+
+          if (!data) return;
+
+
+          if (data.callerCandidates) {
+
+            for (
+              const candidate
+              of data.callerCandidates
+            ) {
+
+              try {
+
+                await peerConnection.addIceCandidate(
+
+                  new RTCIceCandidate(
+                    candidate
+                  )
+
+                );
+
+              } catch (e) {
+
+                console.log(e);
+
+              }
+
+            }
+
+          }
+
+        }
+      );
+
+
+      document.getElementById("status").textContent =
+        "🎥 Terhubung!";
 
     } catch (error) {
 
       console.error(error);
 
       document.getElementById("status").textContent =
-        "❌ Izin kamera/mikrofon ditolak";
+        "❌ " + error.message;
 
     }
 
