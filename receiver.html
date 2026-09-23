@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AVEDOW CALL - Penerima</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f4f7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      width: 90%;
+      max-width: 380px;
+      background: white;
+      padding: 30px 20px;
+      border-radius: 20px;
+      text-align: center;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+
+    .icon {
+      font-size: 60px;
+    }
+
+    h1 {
+      margin: 10px 0;
+    }
+
+    #status {
+      color: #666;
+      margin: 15px 0;
+    }
+
+    #callBox {
+      display: none;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      background: #111;
+      color: white;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+
+    <div class="icon">📞</div>
+
+    <h1>AVEDOW CALL</h1>
+
+    <div id="status">Menghubungkan...</div>
+
+    <div id="callBox">
+      <p>📞 Ada panggilan masuk!</p>
+      <button onclick="terimaPanggilan()">
+        TERIMA PANGGILAN
+      </button>
+    </div>
+
+  </div>
+
+  <script type="module">
+
+    import { initializeApp }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+    import {
+      getAuth,
+      signInAnonymously
+    }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    import {
+      getFirestore,
+      collection,
+      query,
+      where,
+      onSnapshot,
+      orderBy,
+      limit
+    }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDD0xBU25FCgEBs7eEtJhbCs_u8iSPISQw",
+      authDomain: "avedow-call.firebaseapp.com",
+      projectId: "avedow-call",
+      storageBucket: "avedow-call.firebasestorage.app",
+      messagingSenderId: "520287803907",
+      appId: "1:520287803907:web:ecaa9a6b6ebf72e7d14c36",
+      measurementId: "G-YJKPCCSL4G"
+    };
+
+
+    const app = initializeApp(firebaseConfig);
+
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+
+    let panggilanAktif = null;
+
+
+    try {
+
+      await signInAnonymously(auth);
+
+      document.getElementById("status").textContent =
+        "✅ Menunggu panggilan...";
+
+
+      const q = query(
+        collection(db, "calls"),
+        where("status", "==", "menunggu"),
+        orderBy("waktu", "desc"),
+        limit(1)
+      );
+
+
+      onSnapshot(q, (snapshot) => {
+
+        if (!snapshot.empty) {
+
+          panggilanAktif = snapshot.docs[0];
+
+          document.getElementById("status").textContent =
+            "📞 Panggilan masuk!";
+
+          document.getElementById("callBox").style.display =
+            "block";
+
+        }
+
+      });
+
+
+    } catch (error) {
+
+      console.error(error);
+
+      document.getElementById("status").textContent =
+        "❌ Gagal terhubung";
+
+    }
+
+
+    window.terimaPanggilan = function() {
+
+      if (!panggilanAktif) return;
+
+      alert("Panggilan diterima!");
+
+    };
+
+  </script>
+
+</body>
+</html>
